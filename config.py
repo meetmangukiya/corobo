@@ -2,7 +2,7 @@ import logging
 import os
 
 COBOT_ROOT = os.environ.get('COBOT_ROOT', os.getcwd())
-  
+
 BACKEND = 'Gitter'
  
 BOT_EXTRA_BACKEND_DIR = os.path.join(COBOT_ROOT, 'err-backend-gitter')
