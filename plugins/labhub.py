@@ -135,3 +135,21 @@ class LabHub(BotPlugin):
             return 'Can\'t create an issue for a repository that does not '\
                    'exist. Please ensure that the repository is available '\
                    'and owned by coala.'
+
+    @re_botcmd(pattern=r'unassign\s+https://(github|gitlab)\.com/([^/]+)/([^/]+)/issues/(\d+)')
+    def unassign_command(self, msg, match):
+        host = match.group(1)
+        org = match.group(2)
+        repo_name = match.group(3)
+        issue_number = match.group(4)
+
+        user = msg.frm.nick
+
+        if host is 'github':
+            iss = self.IGH.get_repo('{}/{}'.format(org, repo_name)).get_issue(int(issue_number))
+        else:
+            iss = self.IGL.get_repo('{}/{}'.format(org, repo_name)).get_issue(int(issue_number))
+
+        if iss.assignee == user:
+            iss.assignee = ''
+        else:
