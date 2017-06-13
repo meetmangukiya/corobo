@@ -1,6 +1,7 @@
 # Data directory of errbot
 data/
-
+plugins/test.plug
+plugins/test.py
 *.orig
 # Byte-compiled / optimized / DLL files
 __pycache__/

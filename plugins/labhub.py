@@ -57,18 +57,18 @@ class LabHub(BotPlugin):
         except RuntimeError:
             self.log.error('Either of GH_TOKEN or GL_TOKEN is not set')
 
-    @staticmethod
-    def get_teams(token, org_name):
+    @classmethod
+    def get_teams(cls, token, org_name):
         """
         Invite user to team.
         :param token:    Personal access token or oauth token.
         :param org_name: Name of the organization.
         """
-        gh = github3.login(token=token)
-        assert gh is not None
-        org = gh.organization(org_name)
+        cls.GH = github3.login(token=token)
+        assert cls.GH is not None
+        cls.GH_ORG = cls.GH.organization(org_name)
         teams = dict()
-        for team in org.iter_teams():
+        for team in cls.GH_ORG.iter_teams():
             teams[team.name] = team
         return teams
 
@@ -136,14 +136,19 @@ class LabHub(BotPlugin):
                    'exist. Please ensure that the repository is available '\
                    'and owned by coala.'
 
-    @re_botcmd(pattern=r'unassign\s+https://(github|gitlab)\.com/([^/]+)/([^/]+)/issues/(\d+)')
-    def unassign_command(self, msg, match):
-        host = match.group(1)
+    @re_botcmd(pattern=r'unassign\s+https://(github|gitlab)\.com/([^/]+)/([^/]+)/issues/(\d+)', # Ignore LineLengthBear, PyCodeStyleBear
+               flags=re.IGNORECASE)
+    def unassign_cmd(self, msg, match):
         org = match.group(2)
         repo_name = match.group(3)
         issue_number = match.group(4)
 
         user = msg.frm.nick
+
+        try:
+            assert org == GH_ORG_NAME or org == GL_ORG_NAME
+        except AssertionError:
+            return 'Repository not owned by our org.'
 
         if host is 'github':
             iss = self.IGH.get_repo(
@@ -152,11 +157,66 @@ class LabHub(BotPlugin):
             iss = self.IGL.get_repo(
                 '{}/{}'.format(org, repo_name)).get_issue(int(issue_number))
 
-        if not iss.assignee:
-            iss.assignee = user
-            assert iss.assignee == user
-            return 'Congratulations! You\'ve been assigned to the issue'
-        else:
-            return 'The issue is already assigned to someone. Please check if '\
-                   'the assignee is still working on the issue, if not, you '\
-                   'may ask for reassignment on the issue.'
+        try:
+            iss = self.REPOS[repo_name].get_issue(int(issue_number))
+            if user in iss.assignees:
+                iss.unassign(user)
+                return '@{}, you are unassigned now :+1:'.format(user)
+            else:
+                return 'You are not an assignee on the issue.'
+        except KeyError:
+            return 'Repository doesn\'t exist.'
+
+    @re_botcmd(pattern=r'assign\s+https://(github|gitlab)\.com/([^/]+)/([^/]+)/issues/(\d+)',  # Ignore LineLengthBear, PyCodeStyleBear
+               flags=re.IGNORECASE)
+    def assign_cmd(self, msg, match):
+        org = match.group(2)
+        repo_name = match.group(3)
+        iss_number = match.group(4)
+
+        try:
+            assert org == GH_ORG_NAME or org == GL_ORG_NAME
+        except AssertionError:
+            return 'Repository not owned by our org.'
+
+        checks = [
+            # newcomer asking for assigning issues with difficulty level other
+            # than low and newcomer
+            lambda user, iss: (bool(filter(lambda x: ('low' in x) or
+                                                    ('newcomer' in x),
+                                          filter(lambda x:
+                                                        'difficulty' in x,
+                                                     iss.labels)))
+                               if self.TEAMS[self.GH_ORG_NAME +
+                                             ' newcomers'].is_member(user)
+                               else False)
+        ]
+
+        def eligible(user, iss):
+            for chk in checks:
+                if chk(user, iss):
+                    return False
+            return True
+
+        eligility_conditions = [
+            '- A newcomer cannot be assigned to an issue with a difficulty '\
+            'level higher then newcomer or low difficulty.',
+        ]
+
+        try:
+            iss = self.REPOS[repo_name].get_issue(int(iss_number))
+
+            if not iss.assignee:
+                if elligible(user, iss):
+                    iss.assign(user)
+                    return 'Congratulations! You\'ve been assigned to the '\
+                           'issue. :tada:'
+                else:
+                    yield 'You are not eligible to be assigned to this issue.'
+                    yield '\n'.join(eligility_conditions)
+            else:
+                return 'The issue is already assigned to someone. Please '\
+                       'check if the assignee is still working on the issue, '\
+                       'if not, you should ask for reassignment.'
+        except KeyError:
+            return 'Repository doesn\'t exist.'
