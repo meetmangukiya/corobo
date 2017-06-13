@@ -146,10 +146,17 @@ class LabHub(BotPlugin):
         user = msg.frm.nick
 
         if host is 'github':
-            iss = self.IGH.get_repo('{}/{}'.format(org, repo_name)).get_issue(int(issue_number))
+            iss = self.IGH.get_repo(
+                '{}/{}'.format(org, repo_name)).get_issue(int(issue_number))
         else:
-            iss = self.IGL.get_repo('{}/{}'.format(org, repo_name)).get_issue(int(issue_number))
+            iss = self.IGL.get_repo(
+                '{}/{}'.format(org, repo_name)).get_issue(int(issue_number))
 
-        if iss.assignee == user:
-            iss.assignee = ''
+        if not iss.assignee:
+            iss.assignee = user
+            assert iss.assignee == user
+            return 'Congratulations! You\'ve been assigned to the issue'
         else:
+            return 'The issue is already assigned to someone. Please check if '\
+                   'the assignee is still working on the issue, if not, you '\
+                   'may ask for reassignment on the issue.'
