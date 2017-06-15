@@ -22,4 +22,3 @@ RUN addgroup -S errbot \
 
 USER errbot
 WORKDIR /opt/errbot
-CMD errbot
