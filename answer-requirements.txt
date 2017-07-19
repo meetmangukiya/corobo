@@ -1,0 +1,5 @@
+gensim
+docutils
+networkx
+nltk
+spacy
